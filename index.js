@@ -19,19 +19,27 @@ app.use(express.json());
 app.use(cors());
 
 app.get("/tweets", async (req, res) => {
+  // await prisma.tweet.deleteMany();
+
   const [, token] = req.headers?.authorization?.split(" ") || [];
-  // console.log(token);
   if (!token) {
     return res.status(401);
   }
 
   try {
     jwt.verify(token, process.env.JWT_SECRET);
-    const tweets = await prisma.tweet.findMany();
+    const tweets = await prisma.tweet.findMany({
+      include: {
+        user: true,
+      },
+    });
     return res.json(tweets);
   } catch (error) {
-    console.log("caiu no cacth");
-    return res.status(401);
+    if (typeof error === "JsonWebTokenError") {
+      return (res.status = 401);
+    }
+
+    return (res.status = 500);
   }
 });
 
@@ -39,7 +47,7 @@ app.post("/tweets", async (req, res) => {
   const [, token] = req.headers?.authorization?.split(" ") || "";
 
   if (!token) {
-    return res.status(401);
+    return (res.status = 401);
   }
 
   try {
@@ -75,13 +83,20 @@ app.post("/signup", async (req, res) => {
       },
     });
 
-    // console.log(req.body);
+    const accessToken = jwt.sign(
+      {
+        sub: user.id,
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: "24h" }
+    );
 
     return res.json({
       id: user.id,
       name,
       username,
       email,
+      accessToken,
     });
   } catch (error) {
     if (error.meta && !error.meta.target) {
